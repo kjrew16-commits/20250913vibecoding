@@ -1,47 +1,52 @@
 import streamlit as st
-import random
+import pandas as pd
+import altair as alt
+import os
 
 # --- 페이지 기본 설정 ---
-st.set_page_config(page_title="MBTI 공부법 추천", page_icon="📚", layout="centered")
+st.set_page_config(page_title="MBTI 국가별 분포", page_icon="🌍", layout="centered")
+
+# --- 데이터 불러오기 ---
+@st.cache_data
+def load_data():
+    file_name = "countriesMBTI_16types.csv"
+    if os.path.exists(file_name):
+        df = pd.read_csv(file_name)
+    else:
+        uploaded_file = st.file_uploader("CSV 파일을 업로드하세요", type=["csv"])
+        if uploaded_file is not None:
+            df = pd.read_csv(uploaded_file)
+        else:
+            st.stop()
+    return df
+
+df = load_data()
 
 # --- 타이틀 ---
-st.title("✨ MBTI 유형별 공부법 추천 ✨")
-st.write("자신의 MBTI를 선택하면 가장 찰떡같이 어울리는 공부법을 알려드려요! 😎")
+st.title("🌍 국가별 MBTI Top10 분석")
+st.write("MBTI 유형을 선택하면, 해당 유형 비율이 높은 국가 Top10을 보여드려요! 🏆")
 
-# --- MBTI 목록 ---
-mbti_types = [
-    "INTJ", "INTP", "ENTJ", "ENTP",
-    "INFJ", "INFP", "ENFJ", "ENFP",
-    "ISTJ", "ISFJ", "ESTJ", "ESFJ",
-    "ISTP", "ISFP", "ESTP", "ESFP"
-]
+# --- MBTI 유형 선택 ---
+mbti_types = [col for col in df.columns if col != "Country"]
+choice = st.selectbox("MBTI 유형을 선택하세요:", mbti_types)
 
-# --- 공부법 추천 사전 ---
-study_tips = {
-    "INTJ": "계획표 만들기 📅 + 목표 달성 체크 ✔️",
-    "INTP": "궁금한 건 끝까지 파고들기 🔍 + 개념 연결하기 🧩",
-    "ENTJ": "스터디 리더하기 🗣️ + 목표를 수치화하기 📊",
-    "ENTP": "토론으로 아이디어 폭발 💡 + 친구랑 문제 맞추기 🎯",
-    "INFJ": "조용한 공간에서 몰입하기 🌌 + 마인드맵 정리 🌀",
-    "INFP": "감정에 몰입하는 공부 🎶 + 자기 보상 시스템 🍫",
-    "ENFJ": "친구 가르쳐주면서 배우기 👩‍🏫 + 함께 계획 세우기 🤝",
-    "ENFP": "재미있게! 🎉 색깔펜 정리 🌈 + 노래로 암기 🎵",
-    "ISTJ": "체계적인 노트 필기 📖 + 규칙적인 복습 🔁",
-    "ISFJ": "작은 목표 세우고 차근차근 🪜 + 플래시카드 📇",
-    "ESTJ": "시간 관리 철저하게 ⏰ + 스터디 규칙 만들기 📏",
-    "ESFJ": "친구와 함께 퀴즈 풀기 🤩 + 칭찬과 피드백 💬",
-    "ISTP": "실험과 체험 위주 🔬 + 실전 문제 풀이 📝",
-    "ISFP": "편안한 분위기 🌿 + 그림·도식으로 정리 🎨",
-    "ESTP": "몸으로 배우기 🏃 + 제한시간 두고 퀴즈 ⏳",
-    "ESFP": "음악과 함께 공부 🎧 + 발표나 퍼포먼스로 암기 🎤"
-}
+# --- Top10 국가 추출 ---
+top10 = df[["Country", choice]].sort_values(by=choice, ascending=False).head(10)
 
-# --- 선택 박스 ---
-choice = st.selectbox("당신의 MBTI를 골라주세요! 🧐", mbti_types)
+# --- Altair 차트 ---
+chart = (
+    alt.Chart(top10)
+    .mark_bar(color="skyblue")
+    .encode(
+        x=alt.X(choice, title=f"{choice} 비율"),
+        y=alt.Y("Country", sort="-x", title="국가"),
+        tooltip=["Country", choice]
+    )
+    .interactive()
+)
 
-# --- 버튼 ---
-if st.button("📖 나의 맞춤 공부법 보기"):
-    tip = study_tips.get(choice, "아직 준비 중이에요! 🛠️")
-    emojis = ["🔥", "🚀", "🌟", "🍀", "💎", "🎯", "💡", "📌"]
-    st.success(f"{choice} 유형에게 딱 맞는 공부법은... {random.choice(emojis)}\n\n👉 {tip}")
-    st.balloons()
+st.altair_chart(chart, use_container_width=True)
+
+# --- 데이터 테이블 ---
+st.subheader("📋 데이터 보기")
+st.dataframe(top10.reset_index(drop=True))
